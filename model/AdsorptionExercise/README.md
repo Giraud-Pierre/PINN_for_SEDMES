@@ -1,4 +1,4 @@
-# PINN on matlab: Model
+# PINN on matlab: Model/AdsorptionExercise
 
 This folder contain the actual building, training and testing of the PINNs regarding the adsorption exercise.
 
