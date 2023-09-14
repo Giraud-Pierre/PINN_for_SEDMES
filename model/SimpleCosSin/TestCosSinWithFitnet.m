@@ -52,5 +52,5 @@ zlabel('u');
 %% Saving result
 
 savefig('../../results/CosSin/Sin3xCos2t_withFitnet.fig')
-save('../../results/CosSin/Sin3xCos2t_PINNlike_withFitnet.mat',"X","T","U_exact","U_pred","net")
+save('../../results/CosSin/Sin3xCos2t_withFitnet.mat',"X","T","U_exact","U_pred","net")
 
