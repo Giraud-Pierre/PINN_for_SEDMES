@@ -6,8 +6,8 @@ CgCs_pred = forward(net,XT);
 Cg_pred = CgCs_pred(1,:);
 Cs_pred = CgCs_pred(2,:);
     
-mseCg = l2loss(Cg_pred,Cg);
-mseCs = l2loss(Cs_pred,Cs);
+mseCg = l2loss(Cg_pred,Cg) / mean(Cg)
+mseCs = l2loss(Cs_pred,Cs) / mean(Cs)
 
 
 % Calculated loss to be minimized by combining errors.

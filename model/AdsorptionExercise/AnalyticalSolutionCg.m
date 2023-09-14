@@ -1,14 +1,21 @@
 clc;
 clear;
 
+addpath("..\..\data\AdsorptionExercise\")
+addpath("..\..\losses\AdsorptionLosses\AnalyticalSolutions\")
+
 %% Load and prepare data
-load TrainingDataPINNWithDataPoints
+
+x = linspace(0,1,300);
+t = linspace(100,1000,10);
+[x,t] = meshgrid(x,t);
+t = reshape(t,[1,numel(t)]);
+x = reshape(x,[1,numel(x)]);
 
 % Solve Cg for x and t
-Cg = solveAdsorptionPointByPoint(x,t);
-%Csd = [];
+[Cg,Cs] = solveAdsorptionPointByPoint(x,t);
 % List of arrays to convert to dlarray
-arraysList = {'xIC', 'tIC', 'CsIC', 'x', 't','Cg', 'xd', 'td', 'Csd'};
+arraysList = {'x', 't','Cg'};
 
 % Loop through each array and convert it to dlarray or gpu array if gpu is
 % enabled
@@ -27,7 +34,7 @@ end
 
 %% Neural network architecture
 numLayers = 6;
-numNeurons = 64;
+numNeurons = 128;
 
 layers = featureInputLayer(2);
 for i = 1:numLayers-1
@@ -43,10 +50,10 @@ layers = [
 net = dlnetwork(layers) %convert the network into a dlnetwork object
 
 %% Training
-numEpochs = 500;
+numEpochs = 100;
 solverState = lbfgsState;
 
-lossFcn = @(net) dlfeval(@LossCsWithCgSol,net,x,t,Cg,xIC,tIC,CsIC,xd,td,Csd);
+lossFcn = @(net) dlfeval(@LossAnalytical,net,x,t,Cg);
 
 monitor = trainingProgressMonitor( ...
     Metrics="TrainingLoss", ...
@@ -55,7 +62,7 @@ monitor = trainingProgressMonitor( ...
 
 "start training"
 for i = 1:numEpochs
-    [net, solverState] = lbfgsupdate(net,lossFcn,solverState, LineSearchMethod="strong-wolfe");
+    [net, solverState] = lbfgsupdate(net,lossFcn,solverState)%, LineSearchMethod="strong-wolfe");
 
     updateInfo(monitor,Epoch=i);
     recordMetrics(monitor,i, ...
@@ -68,20 +75,25 @@ end
 %% plotting results
 
 xplot = linspace(0,1,100);
-tplot = linspace(0,1000,6);
+tplot = linspace(100,1000,5);
 [tplot,xplot] = meshgrid(tplot,xplot);
 tplot = reshape(tplot,[1,numel(tplot)]);
 xplot = reshape(xplot,[1,numel(xplot)]);
 tdlplot = dlarray(tplot,"CB");
 xdlplot = dlarray(xplot,"CB");
 
-Csplot = forward(net,cat(1,xdlplot,tdlplot));
+Cgpredict = forward(net,cat(1,xdlplot,tdlplot));
 [CgExact, CsExact] = solveAdsorptionPointByPoint(xplot,tplot);
 
-err = norm(extractdata(Csplot) - CsExact) / norm(CsExact)
+err = norm(extractdata(Cgpredict) - CgExact)/ norm(CgExact)
 
-figure()
-plot3(xplot,tplot,extractdata(Csplot),'*','DisplayName',"Cs predicted")
+figure('Name', sprintf('Analytical solution Cg, error = %f',err))
+plot3(xplot,tplot,extractdata(Cgpredict),'*','DisplayName',"Cg predicted")
 hold on
-plot3(xplot,tplot,CsExact,'*', 'DisplayName', "exact Cs")
+plot3(xplot,tplot,CgExact,'*', 'DisplayName', "exact Cg")
 legend()
+
+%% Saving result
+
+%savefig('../../results/AdsorptionExercise/AnalyticalSolutions/Analytical_solution_Cg.fig')
+%save('../../results/AdsorptionExercise/AnalyticalSolutions/Analytical_solution_Cg.mat',"xplot","tplot","CgExact","Cgpredict","net")

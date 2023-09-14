@@ -2,6 +2,11 @@ clear;
 clc;
 format long e
 
+addpath("..\..\losses\SimpleCosSinTest\")
+addpath("..\..\data\SimpleCosSinTest\")
+
+load CosSinData
+
 %% Creating dlarray for deeplearning
 executionEnvironment = "auto";
 if (executionEnvironment == "auto" && canUseGPU) || (executionEnvironment == "gpu")
@@ -15,27 +20,9 @@ else
     Udl = dlarray(U,"CB");
 end
 
-%% Test dlArray
-figure()
-
-%plot random
-% subplot(2,1,1)
-% scatter(extractdata(Xdl), extractdata(Udl), 10, extractdata(Tdl))
-% subplot(2,1,2)
-% scatter(extractdata(Tdl), extractdata(Udl), 10, extractdata(Xdl))
-
-% Plot linspace
-for t_index=1:numel(data_T_linspace)
-    hold on
-    start = 1 + (t_index-1)*numel(data_X_linspace);
-    stop = t_index*numel(data_X_linspace);
-    plot(Xdl(start:stop),Udl(start:stop))
-end
-
-
 %% Neural network architecture
-numLayers = 10;
-numNeurons = 10;
+numLayers = 9;
+numNeurons = 32;
 
 layers = featureInputLayer(2);
 
@@ -52,29 +39,23 @@ layers = [
 
 net = dlnetwork(layers) %convert the network into a dlnetwork object
 
-%% Test net
-
-concat = cat(1,Xdl,Tdl);
-
-U = forward(net,concat);
-
 %% Training with L BFGS
-numEpochs = 1000;
-solverState = lbfgsState;
-
-lossFcn = @(net) dlfeval(@LossU,net, Xdl, Tdl, Udl);
-
-monitor = trainingProgressMonitor( ...
-    Metrics="TrainingLoss", ...
-    Info="Epoch", ...
-    XLabel="Epoch");
-
-for i = 1:numEpochs
-    [net, solverState] = lbfgsupdate(net,lossFcn,solverState, LineSearchMethod="weak-wolfe");
-
-    updateInfo(monitor,Epoch=i);
-    recordMetrics(monitor,i,TrainingLoss=solverState.Loss);
-end
+% numEpochs = 1000;
+% solverState = lbfgsState;
+% 
+% lossFcn = @(net) dlfeval(@LossU,net, Xdl, Tdl, Udl);
+% 
+% monitor = trainingProgressMonitor( ...
+%     Metrics="TrainingLoss", ...
+%     Info="Epoch", ...
+%     XLabel="Epoch");
+% 
+% for i = 1:numEpochs
+%     [net, solverState] = lbfgsupdate(net,lossFcn,solverState, LineSearchMethod="weak-wolfe");
+% 
+%     updateInfo(monitor,Epoch=i);
+%     recordMetrics(monitor,i,TrainingLoss=solverState.Loss);
+% end
 
 %% Training with adam
 numEpochs = 2000;
@@ -111,16 +92,27 @@ end
 %% testing and ploting with same data as training
 X_test = linspace(0,2 * pi,100);
 t_test = linspace(0,2 * pi,6);
+[X, T] = meshgrid(X_test,t_test);
+%Flatten each array to a row vector
+X = reshape(X,[1,numel(X)]);
+T = reshape(T,[1,numel(T)]);
+Xdl = dlarray(X,"CB");
+Tdl = dlarray(T,"CB");
 
-figure()
-for t_idx=1:numel(t_test)
-    T = ones(1,numel(X_test)) * t_test(t_idx);
-    XT = cat(1,X_test, T);
-    U_pred = forward(net,dlarray(XT,"CB"));
-    U_exact = solveU(X_test,T);
+% compute error
+U_pred = forward(net,cat(1,Xdl, Tdl));
+U_exact = solveU(X,T);
 
-    subplot(2,1,1), hold on
-    plot(X_test,U_pred)
-    subplot(2,1,2), hold on
-    plot(X_test,U_exact)
-end
+err = norm(extractdata(U_pred) - U_exact) / norm(U_exact)
+
+%plot the result
+figure('Name',sprintf("AnalyticalSolution sin*cos, error = %f",err))
+plot3(X,T,extractdata(U_pred),'*','DisplayName',"U predicted")
+hold on
+plot3(X,T,U_exact,'*', 'DisplayName', "exact U")
+legend()
+
+%% Saving result
+
+savefig('../../results/CosSin/Sin3xCos2t_PINNlike_withAdam.fig')
+save('../../results/CosSin/Sin3xCos2t_PINNlike_withAdam.mat',"X","T","U_exact","U_pred","net")

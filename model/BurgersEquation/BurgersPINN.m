@@ -2,8 +2,30 @@ clear;
 clc;
 format long e
 
-%% Data
+addpath("..\..\losses\BurgersEquationLosses\")
+addpath("..\..\data\BurgersEquation\")
 
+nu = 0.01/pi;
+
+%% Data
+load BurgersEquationTrainingData
+
+arraysList = {'dataXPINN', 'dataTPINN', 'X0', 'T0', 'U0'};
+
+% Loop through each array and convert it to dlarray or gpu array if gpu is
+% enabled
+executionEnvironment = "auto";
+if (executionEnvironment == "auto" && canUseGPU) || (executionEnvironment == "gpu")
+    for i = 1:numel(arraysList)
+        arrayName = arraysList{i};
+        eval(arrayName + " = gpuArray(dlarray(" + arrayName + ',"CB"));');
+    end
+else
+    for i = 1:numel(arraysList)
+        arrayName = arraysList{i};
+        eval(arrayName + " = dlarray(" + arrayName + ',"CB");');
+    end
+end
 
 %% Network
 numLayers = 9;
@@ -24,25 +46,10 @@ layers = [
 
 net = dlnetwork(layers)
 
-X = dlarray(dataX,"BC");
-T = dlarray(dataT,"BC");
-X0 = dlarray(X0,"CB");
-T0 = dlarray(T0,"CB");
-U0 = dlarray(U0,"CB");
-
-executionEnvironment = "auto";
-if (executionEnvironment == "auto" && canUseGPU) || (executionEnvironment == "gpu")
-    X = gpuArray(X);
-    T = gpuArray(T);
-    X0 = gpuArray(X0);
-    T0 = gpuArray(T0);
-    U0 = gpuArray(U0);
-end
-
 %% Training
-lossFcn = @(net) dlfeval(@modelLoss,net,X,T,X0,T0,U0);
+lossFcn = @(net) dlfeval(@ BurgersLosses,net,dataXPINN,dataTPINN,X0,T0,U0);
 
-numEpochs = 900;
+numEpochs = 500;
 solverState = lbfgsState;
 
 monitor = trainingProgressMonitor( ...
@@ -58,41 +65,34 @@ for i = 1:numEpochs
 end
 
 %% Testing and ploting
+%Create a grid of x and t to test the model
 tTest = [0.25 0.5 0.75 1];
 numPredictions = 1001;
 XTest = linspace(-1,1,numPredictions);
-XTest = dlarray(XTest,"CB");
+[X, T] = meshgrid(XTest,tTest);
+%Flatten each array to a row vector
+X = reshape(X,[1,numel(X)]);
+T = reshape(T,[1,numel(T)]);
+Xdl = dlarray(X,"CB");
+Tdl = dlarray(T,"CB");
 
-figure
-tiledlayout("flow")
-
-for i=1:numel(tTest)
-    t = tTest(i);
-    TTest = t*ones(1,numPredictions);
-    TTest = dlarray(TTest,"CB");
-
-    % Make predictions.
-    XTTest = cat(1,XTest,TTest);
-    UPred = forward(net,XTTest);
-
-    % Calculate target.
-    UTest = solveBurgers(extractdata(XTest),t,0.01/pi);
-
-    % Calculate error.
-    UPred = extractdata(UPred);
-    err = norm(UPred - UTest) / norm(UTest);
-
-    % Plot prediction.
-    nexttile
-    plot(XTest,UPred,"-",LineWidth=2);
-    ylim([-1.1, 1.1])
-
-    % Plot target.
-    hold on
-    plot(XTest, UTest,"--",LineWidth=2)
-    hold off
-
-    title("t = " + t + ", Error = " + gather(err));
+%Compute the errors
+Upredict = forward(net,cat(1,Xdl,Tdl));
+for index=1:numel(X)
+    Uexact(1,index) = solveBurgers(X(index),T(index),nu);
 end
 
-legend(["Prediction" "Target"])
+err = norm(extractdata(Upredict) - Uexact) / norm(Uexact)
+
+%plot the result
+figure('Name',sprintf("PINN for Burger's equation, error = %f",err))
+plot3(X,T,extractdata(Upredict),'*','DisplayName',"U predicted")
+hold on
+plot3(X,T,Uexact,'*', 'DisplayName', "exact U")
+legend()
+
+
+%% Saving result
+
+%savefig('../../results/BurgersEquation/BurgersPINN.fig')
+%save('../../results/BurgersEquation/BurgersPINN.mat',"X","T","Uexact","Upredict","net")

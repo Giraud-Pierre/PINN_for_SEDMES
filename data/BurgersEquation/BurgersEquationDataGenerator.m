@@ -24,24 +24,24 @@ U0 = [u0IC u0BC1 u0BC2];
 %% Colocation points for PINN
 numInternalCollocationPoints = 10000;
 
-points = rand(numInternalCollocationPoints,2);
+points = rand(2,numInternalCollocationPoints);
 
-dataXPINN = 2*points(:,1)-1;
-dataTPINN = points(:,2);
+dataXPINN = 2*points(1,:)-1;
+dataTPINN = points(2,:);
 
 %% Colocation points for analytical solution
 numInternalCollocationPoints = 100;
 
-points = rand(numInternalCollocationPoints,2);
+points = rand(2,numInternalCollocationPoints);
 
-dataXAnaSol = 2*points(:,1)-1;
-dataTAnaSol = points(:,2);
+dataXAnaSol = 2*points(1,:)-1;
+dataTAnaSol = points(2,:);
 
 
 DataUAnaSol = ones(1,numInternalCollocationPoints);
 
 for index=1:numInternalCollocationPoints
-    DataUAnaSol(index) = solveBurgers(dataXAnaSol(index),dataTAnaSol(index),0.01/pi);
+    DataUAnaSol(1,index) = solveBurgers(dataXAnaSol(1,index),dataTAnaSol(1,index),0.01/pi);
 end
 
 %% Save workspace

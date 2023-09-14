@@ -2,6 +2,7 @@ clc;
 clear;
 
 addpath("..\..\losses\AdsorptionLosses\PINN\")
+addpath("..\..\data\AdsorptionExercise\")
 
 %% Load and prepare data
 load TrainingDataPINNWithDataPoints
@@ -28,21 +29,33 @@ end
 numLayers = 6;
 numNeurons = 64;
 
-layers = featureInputLayer(2);
+layersCg = featureInputLayer(2);
 for i = 1:numLayers-1
-    layers = [
-        layers
+    layersCg = [
+        layersCg
         fullyConnectedLayer(numNeurons)
         tanhLayer];
 end
-layers = [
-    layers
+layersCg = [
+    layersCg
     fullyConnectedLayer(1)];
 
+layersCs = featureInputLayer(2);
+for i = 1:numLayers-1
+    layersCs = [
+        layersCs
+        fullyConnectedLayer(numNeurons)
+        tanhLayer];
+end
+layersCs = [
+    layersCs
+    fullyConnectedLayer(1)];
+
+
 % Network for Cg
-netCg = dlnetwork(layers) %convert the network into a dlnetwork object
+netCg = dlnetwork(layersCg) %convert the network into a dlnetwork object
 % Network for Cs
-netCs = dlnetwork(layers) %convert the network into a dlnetwork object
+netCs = dlnetwork(layersCs) %convert the network into a dlnetwork object
 
 %% Training
 numEpochs = 100;
@@ -59,8 +72,8 @@ monitor = trainingProgressMonitor( ...
 
 "start training"
 for i = 1:numEpochs
-    [netCg, solverStateCg] = lbfgsupdate(netCg,lossFcnCg,solverStateCg, LineSearchMethod="strong-wolfe");
-    [netCs, solverStateCs] = lbfgsupdate(netCs,lossFcnCs,solverStateCs, LineSearchMethod="strong-wolfe");
+    [netCg, solverStateCg] = lbfgsupdate(netCg,lossFcnCg,solverStateCg);%, LineSearchMethod="strong-wolfe");
+    [netCs, solverStateCs] = lbfgsupdate(netCs,lossFcnCs,solverStateCs);%, LineSearchMethod="strong-wolfe");
 
     updateInfo(monitor,Epoch=i);
     recordMetrics(monitor,i, ...

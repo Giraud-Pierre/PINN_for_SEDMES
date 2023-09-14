@@ -25,11 +25,11 @@ Cst = gradientsCs{2};
 % Calculate mseF. Enforce PDEs
 fCg = Cgt + ug * Cgx + (kg * as) * (Cg_pred - (Cs_pred/Ke)) / epsb;
 zeroTarget = zeros(size(fCg),"like",fCg);
-mseFCg = l2loss(fCg,zeroTarget);
+mseFCg = l2loss(fCg,zeroTarget) / mean(Cgd);
 
 fCs = Cst - (Cg_pred - (Cs_pred/Ke)) * (kg*as) / (1-epsb);
 zeroTarget = zeros(size(fCs),"like",fCs);
-mseFCs = l2loss(fCs,zeroTarget);
+mseFCs = l2loss(fCs,zeroTarget) / mean(Csd);
 
 % enforce initial conditions
 XTIC = cat(1,XIC,TIC);
@@ -45,7 +45,7 @@ XT0 = cat(1,X0,T0);
 CgCs0_pred = forward(net,XT0);
 Cg0_pred = CgCs0_pred(1,:);
 
-mseCg0 = l2loss(Cg0_pred,Cg0);
+mseCg0 = l2loss(Cg0_pred,Cg0) / mean(Cgd);
 
 % enforce boundary condition 2
 XTm = cat(1,Xm,Tm);
@@ -54,7 +54,7 @@ Cgm_pred = CgCsm_pred(1,:);
 
 Cgm_x_pred = dlgradient(sum(Cgm_pred,"all"),Xm,EnableHigherDerivatives=true);
 
-mseCgm = l2loss(Cgm_x_pred,Cgm);
+mseCgm = l2loss(Cgm_x_pred,Cgm) / mean(Cgd);
 
 % enforce data points
 if size(Xd) == [0 0] %if there is no datapoints
@@ -66,8 +66,8 @@ else
     Cgd_pred = CgCsd_pred(1,:);
     Csd_pred = CgCsd_pred(2,:);
     
-    mseCgd = l2loss(Cgd_pred,Cgd);
-    mseCsd = l2loss(Csd_pred,Csd);
+    mseCgd = l2loss(Cgd_pred,Cgd) / mean(Cgd);
+    mseCsd = l2loss(Csd_pred,Csd) / mean(Csd);
 end
 
 % Calculated loss to be minimized by combining errors.
